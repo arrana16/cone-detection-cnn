@@ -1,0 +1,9 @@
+# FSOCO archive, extracted images/annotations, and generated manifests
+/data/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# macOS metadata
+.DS_Store
