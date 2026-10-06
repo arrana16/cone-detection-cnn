@@ -35,12 +35,12 @@ class Prediction(NamedTuple):
 
 
 class ConeColorClassifier(nn.Module):
-    """EfficientNet B0 with a three-class cone-colour head."""
+    """EfficientNet V2 S with a three-class cone-colour head."""
 
     def __init__(self, *, pretrained: bool = True) -> None:
         super().__init__()
-        weights = models.EfficientNet_B0_Weights.DEFAULT if pretrained else None
-        self.network = models.efficientnet_b0(weights=weights)
+        weights = models.EfficientNet_V2_S_Weights.DEFAULT if pretrained else None
+        self.network = models.efficientnet_v2_s(weights=weights)
         in_features = self.network.classifier[-1].in_features
         self.network.classifier[-1] = nn.Linear(in_features, NUM_CLASSES)
 

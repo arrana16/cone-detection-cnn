@@ -22,6 +22,16 @@ CLASS_TO_LABEL = {
     "large_orange_cone": "other",
     "unknown_cone": "",
 }
+LABEL_SCHEMES = {
+    "legacy": CLASS_TO_LABEL,
+    "amz32": {
+        "blue_cone": "blue",
+        "yellow_cone": "yellow",
+        "orange_cone": "unknown",
+        "large_orange_cone": "unknown",
+        "unknown_cone": "unknown",
+    },
+}
 SPLIT_FRACTIONS = {"train": 0.8, "val": 0.1, "test": 0.1}
 TINY_SIDE_PIXELS = 8
 FIELDNAMES = (
@@ -62,7 +72,9 @@ def _is_issue_tag(name: str) -> bool:
     return name == "issue" or name.startswith("issue:")
 
 
-def _read_dataset(root: Path) -> tuple[list[dict[str, Any]], dict[str, int]]:
+def _read_dataset(
+    root: Path, class_to_label: dict[str, str]
+) -> tuple[list[dict[str, Any]], dict[str, int]]:
     annotation_files = sorted(root.glob("*/ann/*.json"))
     if not annotation_files:
         raise ValueError(f"no annotation files found under {root}/<contributor>/ann")
@@ -101,7 +113,7 @@ def _read_dataset(root: Path) -> tuple[list[dict[str, Any]], dict[str, int]]:
             if not isinstance(item, dict):
                 raise ValueError(f"invalid object #{object_index} in {annotation_path}")
             class_name = item.get("classTitle")
-            if class_name not in CLASS_TO_LABEL:
+            if class_name not in class_to_label:
                 raise ValueError(
                     f"unsupported class {class_name!r} in {annotation_path}"
                 )
@@ -149,7 +161,7 @@ def _read_dataset(root: Path) -> tuple[list[dict[str, Any]], dict[str, int]]:
                     "box_width": box_width,
                     "box_height": box_height,
                     "original_class": class_name,
-                    "target_label": CLASS_TO_LABEL[class_name],
+                    "target_label": class_to_label[class_name],
                     "image_tags": image_tags,
                     "object_tags": object_tags,
                     "issue_flag": any(
@@ -210,10 +222,20 @@ def _json_list(values: list[str]) -> str:
     return json.dumps(values, ensure_ascii=False, separators=(",", ":"))
 
 
-def prepare_manifest(root: Path, output_path: Path, seed: int = 42) -> dict[str, Any]:
+def prepare_manifest(
+    root: Path,
+    output_path: Path,
+    seed: int = 42,
+    label_scheme: str = "legacy",
+) -> dict[str, Any]:
     """Validate annotations and write the manifest plus a split summary JSON."""
 
-    rows, image_counts = _read_dataset(root)
+    if label_scheme not in LABEL_SCHEMES:
+        raise ValueError(
+            f"unsupported label scheme {label_scheme!r}; "
+            f"choose from {', '.join(sorted(LABEL_SCHEMES))}"
+        )
+    rows, image_counts = _read_dataset(root, LABEL_SCHEMES[label_scheme])
     assignments = _assign_group_splits(image_counts, seed)
     for row in rows:
         row["split"] = assignments[row["contributor"]]
@@ -245,6 +267,7 @@ def prepare_manifest(root: Path, output_path: Path, seed: int = 42) -> dict[str,
             target_counts[row["target_label"]] += 1
     total_images = sum(image_counts.values())
     summary = {
+        "label_scheme": label_scheme,
         "seed": seed,
         "target_split_fractions": SPLIT_FRACTIONS,
         "image_count": total_images,
@@ -286,9 +309,17 @@ def main(argv: list[str] | None = None) -> int:
         help="CSV output path (a matching *_summary.json is also written)",
     )
     parser.add_argument("--seed", type=int, default=42, help="split seed (default: 42)")
+    parser.add_argument(
+        "--label-scheme",
+        choices=tuple(LABEL_SCHEMES),
+        default="legacy",
+        help="class mapping to write (default: legacy)",
+    )
     args = parser.parse_args(argv)
     try:
-        summary = prepare_manifest(args.data_root, args.output, args.seed)
+        summary = prepare_manifest(
+            args.data_root, args.output, args.seed, label_scheme=args.label_scheme
+        )
     except (OSError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2

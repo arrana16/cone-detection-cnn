@@ -4,8 +4,10 @@ This context defines the meaning of the labels and crops used by the offline con
 
 ## Language
 
-**Cone crop**: An RGB image region centered on one annotated cone, with 15% context around the bounding box.
+**Cone crop**: A square RGB image region centered on one annotated cone, with a side 1.3 times the longer annotation dimension. The crop is resized to 32×32 for the blue/yellow/unknown task.
 
-**Other**: An orange cone. The small and large orange source labels share this classifier label.
+**Other**: A legacy classifier label for the small and large orange source labels.
 
-**Unknown cone**: A cone whose colour is not assigned to blue, yellow, or orange in the source annotations. It is retained for separate analysis and has no training target in the three-class task.
+**Unknown cone**: A source annotation whose cone colour is not assigned to blue, yellow, or orange.
+
+**Unknown**: The classifier label for source annotations of orange cones and unknown cones in the blue/yellow/unknown task.

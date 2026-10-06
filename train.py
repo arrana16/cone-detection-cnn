@@ -1,4 +1,4 @@
-"""Train the cone-colour head of a pretrained EfficientNet B0."""
+"""Train the cone-colour head of a pretrained EfficientNet V2 S."""
 
 from __future__ import annotations
 
@@ -376,12 +376,12 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         "train_counts": dict(train_counts),
         "val_counts": dict(Counter(row["target_label"] for row in val_rows)),
         "class_names": CLASS_NAMES,
-        "model_architecture": "efficientnet_b0",
+        "model_architecture": "efficientnet_v2_s",
         "input_size": INPUT_SIZE,
         "imagenet_mean": IMAGENET_MEAN,
         "imagenet_std": IMAGENET_STD,
         "pretrained_backbone": True,
-        "trainable_parameters": "EfficientNet B0 final classifier layer only",
+        "trainable_parameters": "EfficientNet V2 S final classifier layer only",
     }
     (args.output_dir / "config.json").write_text(
         json.dumps(config, indent=2) + "\n", encoding="utf-8"
@@ -456,7 +456,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--data-root", type=Path, default=Path("data/fsoco_bounding_boxes_train")
     )
     parser.add_argument(
-        "--output-dir", type=Path, default=Path("runs/efficientnet_b0")
+        "--output-dir", type=Path, default=Path("runs/efficientnet_v2_s")
     )
     parser.add_argument("--epochs", type=int, default=8)
     parser.add_argument("--batch-size", type=int, default=32)
