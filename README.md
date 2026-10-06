@@ -116,6 +116,19 @@ python3 -m experiments.amz_cnn train \
 
 EfficientNet V2 S uses ImageNet weights and trains only its final classifier layer. The AMZ CNN trains from scratch. It uses same-padded convolutions with batch normalization, ReLU, 0.2 dropout, and max pooling; its `4×4×128` feature map flattens to 2048 values before the fully connected layers. Training defaults to 8 epochs, batch size 32, patience 3, and AdamW weight decay `1e-4`; learning rates are `0.003` for EfficientNet and `0.001` for AMZ CNN. In an interactive terminal, train and validation progress updates on one in-place line per phase; redirected logs receive periodic progress lines. `history.csv` and `config.json` are updated in the run directory, and the best checkpoint is `best_model.pt`.
 
+To train the AMZ CNN for 16 more epochs from an existing best checkpoint, use a new output directory:
+
+```bash
+python3 -m experiments.amz_cnn train \
+  --checkpoint runs/amz32/amz_cnn/full/best_model.pt \
+  --output-dir runs/amz32/amz_cnn/continued \
+  --epochs 16 --patience 16 --device auto
+```
+
+With `--checkpoint`, `--epochs` counts additional epochs after the checkpoint's saved epoch. The new run keeps its own `history.csv`, with epoch numbers continuing from that saved epoch, and retains the input checkpoint as `best_model.pt` until validation macro F1 improves. The checkpoint contains model weights but no optimizer state, so AdamW starts fresh. Use the same manifest, data root, seed, and per-class limits as the original run. `--patience 16` allows all 16 additional epochs even if validation does not improve.
+
+The current `runs/amz32/amz_cnn/full/best_model.pt` was saved at epoch 6, although that run completed 8 epochs. To reach epoch 24 from this checkpoint, use `--epochs 18 --patience 18` instead.
+
 Evaluate a chosen checkpoint on the held-out test split after training:
 
 ```bash

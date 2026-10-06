@@ -314,6 +314,31 @@ def train_model(
 
     if args.output_dir.exists() and any(args.output_dir.iterdir()):
         raise ValueError(f"run directory is not empty: {args.output_dir}")
+    source_checkpoint = None
+    start_epoch = 0
+    best_f1 = -1.0
+    if args.checkpoint is not None:
+        source_checkpoint = torch.load(args.checkpoint, map_location="cpu", weights_only=True)
+        if source_checkpoint.get("model_architecture") != model_name:
+            raise ValueError("checkpoint architecture does not match the selected model")
+        if tuple(source_checkpoint.get("class_names", ())) != CLASS_NAMES:
+            raise ValueError("checkpoint class names do not match this experiment")
+        if source_checkpoint.get("input_size") != INPUT_SIZE:
+            raise ValueError("checkpoint input size does not match this experiment")
+        source_config = source_checkpoint.get("config", {})
+        for key in ("manifest", "data_root"):
+            if Path(source_config.get(key, "")).resolve() != getattr(args, key).resolve():
+                raise ValueError(f"checkpoint {key} does not match the requested data")
+        for key in ("seed", "max_train_per_class", "max_val_per_class"):
+            if source_config.get(key) != getattr(args, key):
+                raise ValueError(f"checkpoint {key} does not match the requested data")
+        start_epoch = source_checkpoint.get("epoch", 0)
+        if not isinstance(start_epoch, int) or start_epoch < 1:
+            raise ValueError("checkpoint has no valid epoch")
+        best_f1 = source_checkpoint.get("validation_metrics", {}).get("macro_f1")
+        if not isinstance(best_f1, (int, float)):
+            raise ValueError("checkpoint has no validation macro F1")
+        model.load_state_dict(source_checkpoint["model_state_dict"])
     train_rows = read_split(args.manifest, "train", args.max_train_per_class, args.seed)
     val_rows = read_split(args.manifest, "val", args.max_val_per_class, args.seed)
     train_counts = Counter(row["target_label"] for row in train_rows)
@@ -347,6 +372,10 @@ def train_model(
         "seed": args.seed,
         "device": str(device),
         "epochs": args.epochs,
+        "start_epoch": start_epoch,
+        "end_epoch": start_epoch + args.epochs,
+        "source_checkpoint": str(args.checkpoint) if args.checkpoint else None,
+        "optimizer_state_restored": False,
         "batch_size": args.batch_size,
         "learning_rate": args.learning_rate,
         "weight_decay": args.weight_decay,
@@ -367,11 +396,14 @@ def train_model(
         json.dumps(config, indent=2) + "\n", encoding="utf-8"
     )
 
-    best_f1 = -1.0
-    best_epoch = 0
+    best_epoch = start_epoch
+    if source_checkpoint is not None:
+        initial_checkpoint = {**source_checkpoint, "config": config}
+        torch.save(initial_checkpoint, args.output_dir / "best_model.pt")
     stale_epochs = 0
     history: list[dict[str, Any]] = []
-    for epoch in range(1, args.epochs + 1):
+    end_epoch = start_epoch + args.epochs
+    for epoch in range(start_epoch + 1, end_epoch + 1):
         sampler.set_epoch(epoch - 1)
         train_loss, train_metrics = _run_epoch(
             model,
@@ -381,7 +413,7 @@ def train_model(
             optimizer,
             phase="train",
             epoch=epoch,
-            epochs=args.epochs,
+            epochs=end_epoch,
         )
         val_loss, val_metrics = _run_epoch(
             model,
@@ -391,7 +423,7 @@ def train_model(
             None,
             phase="val",
             epoch=epoch,
-            epochs=args.epochs,
+            epochs=end_epoch,
         )
         record = {
             "epoch": epoch,
@@ -524,7 +556,17 @@ def add_train_arguments(parser: argparse.ArgumentParser, *, learning_rate: float
     parser.add_argument("--manifest", type=Path, default=MANIFEST_DEFAULT)
     parser.add_argument("--data-root", type=Path, default=DATA_ROOT_DEFAULT)
     parser.add_argument("--output-dir", type=Path, required=True)
-    parser.add_argument("--epochs", type=int, default=8)
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        default=8,
+        help="epochs to train, or additional epochs when using --checkpoint",
+    )
+    parser.add_argument(
+        "--checkpoint",
+        type=Path,
+        help="start from a saved best_model.pt in a new output directory",
+    )
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--learning-rate", type=float, default=learning_rate)
     parser.add_argument("--weight-decay", type=float, default=1e-4)
@@ -581,7 +623,7 @@ def run_cli(
                 model_name=model_name,
                 model_settings=model_settings,
             )
-        except (FileNotFoundError, OSError, ValueError) as exc:
+        except (FileNotFoundError, OSError, ValueError, RuntimeError) as exc:
             print(f"error: {exc}", file=sys.stderr)
             return 2
     else:
