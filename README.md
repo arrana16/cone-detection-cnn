@@ -53,7 +53,24 @@ The default split keeps each contributor folder together, uses seed 42, and targ
 - `crop_from_box` extracts one RGB cone box with a 15% margin on each side of its longer dimension, pads at image borders with a neutral ImageNet-mean colour, and returns a square crop.
 - `preprocess_crop` pads to square if needed, resizes bilinearly to 96×96, and applies ImageNet normalization.
 - `predict_crop` returns the highest scoring label and all three softmax probabilities. `predict_box` combines box extraction and prediction. Neither applies an abstention threshold.
-- `build_model(pretrained=True)` uses Torchvision's MobileNetV3 Small ImageNet weights, downloading them if they are not cached. Pass `pretrained=False` for a random-weight shape check; its predictions are not meaningful until trained.
+- `build_model(pretrained=True)` uses Torchvision's EfficientNet B0 ImageNet weights, downloading them if they are not cached. Pass `pretrained=False` for a random-weight shape check; its predictions are not meaningful until trained.
+
+## Train the classifier head
+
+`train.py` performs transfer learning. It loads the pretrained ImageNet EfficientNet B0 backbone, replaces its final layer with a fresh three-class layer, freezes the backbone, and trains only that final layer. It reads labelled rows from the `train` and `val` manifest splits, applies class-weighted cross-entropy, and never uses the `test` split. The best checkpoint is selected by validation macro F1.
+
+Run a small balanced pilot similar to the interrupted experiment:
+
+```bash
+python3 train.py \
+  --max-train-per-class 600 \
+  --max-val-per-class 150 \
+  --epochs 8 \
+  --device auto \
+  --output-dir runs/efficientnet_b0_pilot
+```
+
+For training on every labelled training row, omit both `--max-*-per-class` options. The default output directory is `runs/efficientnet_b0/`. During each training and validation pass, the command shows batch progress, running loss and accuracy, and estimated time remaining. Training writes `best_model.pt`, `history.csv`, and `config.json`; `.gitignore` excludes run artifacts and model weights. The first run downloads the pretrained weights if Torchvision has not cached them. Use `python3 train.py --help` to see all options. Training the output layer is an initial transfer-learning baseline; it does not guarantee that the model will generalize well to the full dataset or to camera footage.
 
 ## Validation
 

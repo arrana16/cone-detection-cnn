@@ -1,5 +1,8 @@
 # FSOCO archive, extracted images/annotations, and generated manifests
 /data/
+/runs/
+*.pt
+*.pth
 
 # Python bytecode
 __pycache__/
