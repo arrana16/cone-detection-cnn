@@ -66,6 +66,7 @@ def main(argv: list[str] | None = None) -> int:
         model_name=MODEL_NAME,
         build_model=build_model,
         learning_rate=0.001,
+        pretrained_for_training=False,
         model_settings={
             "pretrained_backbone": False,
             "architecture": [

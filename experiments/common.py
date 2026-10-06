@@ -556,6 +556,7 @@ def run_cli(
     build_model: Callable[[bool], nn.Module],
     learning_rate: float,
     model_settings: dict[str, Any],
+    pretrained_for_training: bool = True,
 ) -> int:
     parser = argparse.ArgumentParser(description=f"Train and evaluate {model_name}.")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -576,7 +577,7 @@ def run_cli(
         try:
             train_model(
                 args,
-                model=build_model(True),
+                model=build_model(pretrained_for_training),
                 model_name=model_name,
                 model_settings=model_settings,
             )
