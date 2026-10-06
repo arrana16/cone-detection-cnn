@@ -225,6 +225,8 @@ def _run_epoch(
     confusion = torch.zeros((len(CLASS_NAMES), len(CLASS_NAMES)), dtype=torch.int64)
     started = time.monotonic()
     last_percent = -10
+    last_update = started
+    interactive = sys.stderr.isatty()
     context = torch.enable_grad() if training else torch.inference_mode()
     with context:
         for batch_number, (images, labels) in enumerate(loader, start=1):
@@ -248,20 +250,32 @@ def _run_epoch(
             )
             confusion += bins.reshape(len(CLASS_NAMES), len(CLASS_NAMES))
             percent = int(100 * batch_number / max(len(loader), 1))
-            if percent >= last_percent + 10 or batch_number == len(loader):
+            now = time.monotonic()
+            should_update = (
+                (interactive and now - last_update >= 0.5)
+                or (not interactive and percent >= last_percent + 10)
+                or batch_number == len(loader)
+            )
+            if should_update:
                 elapsed = time.monotonic() - started
                 eta = elapsed / batch_number * (len(loader) - batch_number)
                 avg_loss = loss_total / count
                 accuracy = float(confusion.diag().sum()) / count
-                print(
+                line = (
                     f"Epoch {epoch}/{epochs} | {phase} | {percent:3d}% "
                     f"{batch_number:,}/{len(loader):,} batches | "
                     f"loss {avg_loss:.4f} | acc {accuracy:.1%} | "
-                    f"ETA {eta / 60:.1f} min",
-                    file=sys.stderr,
-                    flush=True,
+                    f"ETA {eta / 60:.1f} min"
                 )
+                if interactive:
+                    sys.stderr.write("\r\033[2K" + line)
+                    if batch_number == len(loader):
+                        sys.stderr.write("\n")
+                    sys.stderr.flush()
+                else:
+                    print(line, file=sys.stderr, flush=True)
                 last_percent = percent
+                last_update = now
     if not count:
         raise ValueError("data loader produced no examples")
     return loss_total / count, _metrics(confusion)

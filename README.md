@@ -114,7 +114,7 @@ python3 -m experiments.amz_cnn train \
   --output-dir runs/amz32/amz_cnn/full --device auto
 ```
 
-EfficientNet V2 S uses ImageNet weights and trains only its final classifier layer. The AMZ CNN trains from scratch. It uses same-padded convolutions with batch normalization, ReLU, 0.2 dropout, and max pooling; its `4×4×128` feature map flattens to 2048 values before the fully connected layers. Training defaults to 8 epochs, batch size 32, patience 3, and AdamW weight decay `1e-4`; learning rates are `0.003` for EfficientNet and `0.001` for AMZ CNN. Progress and epoch metrics are written to the terminal; `history.csv` and `config.json` are updated in the run directory, and the best checkpoint is `best_model.pt`.
+EfficientNet V2 S uses ImageNet weights and trains only its final classifier layer. The AMZ CNN trains from scratch. It uses same-padded convolutions with batch normalization, ReLU, 0.2 dropout, and max pooling; its `4×4×128` feature map flattens to 2048 values before the fully connected layers. Training defaults to 8 epochs, batch size 32, patience 3, and AdamW weight decay `1e-4`; learning rates are `0.003` for EfficientNet and `0.001` for AMZ CNN. In an interactive terminal, train and validation progress updates on one in-place line per phase; redirected logs receive periodic progress lines. `history.csv` and `config.json` are updated in the run directory, and the best checkpoint is `best_model.pt`.
 
 Evaluate a chosen checkpoint on the held-out test split after training:
 
